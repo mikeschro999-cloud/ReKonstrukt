@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReKonstrukt</title>
+<style>
+:root{--bg:#fff;--card:#fff;--tx:#000;--mut:#6b6b6b;--bd:#e4e4e4;--ac:#000;--acd:#333;--bad:#d62828;--warn:#e08a00;--bone:#000}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#000;--tx:#fff;--mut:#9a9a9a;--bd:#2a2a2a;--ac:#fff;--acd:#cfcfcf;--bad:#ff5c5c;--warn:#ffb340;--bone:#fff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:56px 20px 8px;max-width:920px;margin:0 auto}
+h1{margin:0;font-size:2.6rem;letter-spacing:-.03em;font-weight:700}
+h1 span{font-weight:300}
+header p{margin:4px 0 0;color:var(--mut);max-width:60ch}
+main{max-width:920px;margin:0 auto;padding:24px 20px 80px;display:grid;gap:16px}
+section{background:var(--card);border:1px solid var(--bd);border-radius:28px;padding:28px}
+h2{margin:0 0 14px;font-size:1.1rem;font-weight:600}
+label{display:block;font-size:.88rem;color:var(--mut);margin-bottom:6px}
+input[type=password],input[type=text],textarea{width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:18px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:150px;resize:vertical}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.drop{border:2px dashed var(--bd);border-radius:22px;padding:22px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
+.drop.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 8%,transparent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--bd);border-radius:999px;padding:4px 6px 4px 12px;font-size:.85rem}
+.chip button{border:0;background:none;color:var(--mut);cursor:pointer;font-size:1rem;line-height:1}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button.p,button.s{border-radius:999px;font:inherit;font-weight:600;padding:11px 20px;cursor:pointer;border:1px solid var(--ac)}
+button.p{background:var(--ac);color:var(--bg)}
+button.p:hover{background:var(--acd)}
+button.p:disabled{opacity:.5;cursor:not-allowed}
+button.s{background:transparent;color:var(--ac)}
+.bar{height:10px;background:var(--bd);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ac);border-radius:99px}
+#status{margin:8px 0 0;font-size:.88rem;color:var(--mut)}
+#err{font-size:.8rem;color:var(--warn);margin:4px 0 0;word-break:break-word}
+.hide{display:none}
+#report h3{margin:18px 0 6px;font-size:1rem}
+#report h3:first-child{margin-top:0}
+#report ul{padding-left:20px}
+#report p{max-width:75ch}
+svg{width:100%;height:auto;background:var(--bg);border:1px solid var(--bd);border-radius:22px;display:block}
+.cap{min-height:2.8em;margin:10px 0;font-weight:500}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--ac)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.82rem;color:var(--mut);margin-top:8px}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.note{font-size:.8rem;color:var(--mut)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Re<span>Konstrukt</span></h1>
+  <p>Verletzungsbefunde und Schilderungen hochladen, plausiblen Unfallhergang als Bericht und Animation erhalten.</p>
+</header>
+<main>
+  <section>
+    <h2>Google-AI-Schlüssel</h2>
+    <label for="key">API-Key (Google AI Studio). Er bleibt in diesem Browser und geht nur an Google.</label>
+    <input id="key" type="password" autocomplete="off" placeholder="AIza…">
+  </section>
+
+  <section>
+    <h2>Fall</h2>
+    <label for="note">Schilderung, Befunde, Arztbericht</label>
+    <textarea id="note" placeholder="z. B. Patient berichtet von Rippenschmerzen links, kann sich nicht an den Sturz erinnern …"></textarea>
+    <div class="drop" id="drop" tabindex="0" style="margin-top:12px">Bilder, PDFs oder Textdateien hierher ziehen oder tippen zum Auswählen</div>
+    <input id="fin" type="file" multiple accept="image/*,.pdf,.txt,.md,.csv,.json" class="hide">
+    <div class="chips" id="chips"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="p" id="go">Generieren</button>
+      <button class="s hide" id="stop">Abbrechen</button>
+    </div>
+    <div id="prog" class="hide" style="margin-top:16px">
+      <div class="bar"><i id="fill"></i></div>
+      <p id="status"></p>
+      <p id="err"></p>
+    </div>
+  </section>
+
+  <section id="repS" class="hide">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Bericht</h2><button class="s" id="copy">Kopieren</button></div>
+    <div id="report" style="margin-top:12px"></div>
+    <p class="note">KI-generierte Hypothesen als Entscheidungshilfe. Sie ersetzen weder Untersuchung noch ärztliche Beurteilung. Patientendaten nur nach geltenden Datenschutzvorgaben an externe KI-Dienste übermitteln.</p>
+  </section>
+
+  <section id="aniS" class="hide">
+    <h2>Mögliche Entstehung</h2>
+    <svg id="svg" viewBox="0 0 160 90" role="img" aria-label="Animation des möglichen Unfallhergangs"></svg>
+    <p class="cap" id="cap"></p>
+    <div class="row">
+      <button class="s" id="play">Pause</button>
+      <button class="s" id="replay">Neu starten</button>
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Zeitleiste">
+    </div>
+    <div class="legend"><span><b style="background:var(--bad)"></b>vermutete Fraktur oder Verletzung</span><span><b style="background:var(--warn)"></b>Aufprall</span></div>
+  </section>
+</main>
+
+<script>
+const MODELS=["gemini-2.5-flash","gemini-2.5-pro","gemini-2.0-flash","gemini-2.5-flash-lite","gemini-flash-latest"];
+const J=["head","neck","shoulderL","shoulderR","elbowL","elbowR","handL","handR","hip","kneeL","kneeR","footL","footR"];
+const BONES=["neck-head","neck-shoulderL","neck-shoulderR","shoulderL-elbowL","elbowL-handL","shoulderR-elbowR","elbowR-handR","neck-hip","hip-kneeL","kneeL-footL","hip-kneeR","kneeR-footR"];
+const SYS1=`Du bist ein erfahrener unfallchirurgisch-notfallmedizinischer Assistent für Ärztinnen und Ärzte. Du erhältst Schilderungen, Befunde und Bilder zu einer Verletzung. Schließe aktiv aus den Angaben auf den wahrscheinlichen Hergang und auf Verletzungen, die nicht genannt wurden, aber zu erwarten sind. Beispiele: Gedächtnislücke oder Bewusstlosigkeit bei Sturz spricht für Kopfanprall (SHT); Rippenfrakturen können Pneumothorax, Leber-, Milz- oder Nierenverletzung bedeuten; eine Beinfraktur mit Amnesie spricht für einen Sturz mit Kopfbeteiligung, nicht nur für direkte Gewalt aufs Bein. Antworte auf Deutsch in Markdown, prägnant, mit diesen Abschnitten als ###-Überschriften: Zusammenfassung, Wahrscheinlichster Hergang, Alternative Hergänge, Zu erwartende Begleitverletzungen, Empfohlene Diagnostik und Überwachung, Unsicherheiten. Kennzeichne Spekulatives klar als Hypothese.`;
+const SYS2=`Du erzeugst die Daten für eine einfache 2D-Strichmännchen-Animation (Seitenansicht), die den wahrscheinlichsten Hergang aus dem Bericht zeigt. Antworte NUR mit JSON, ohne Markdown. Schema:
+{"frames":[{"label":"kurzer deutscher Satz zum Schritt","joints":{"head":[x,y],"neck":[x,y],"shoulderL":[x,y],"shoulderR":[x,y],"elbowL":[x,y],"elbowR":[x,y],"handL":[x,y],"handR":[x,y],"hip":[x,y],"kneeL":[x,y],"kneeR":[x,y],"footL":[x,y],"footR":[x,y]},"impact":[x,y] oder null}],"injuries":[{"bone":"...","label":"z. B. Rippenfraktur links","frame":Index}]}
+Koordinatensystem 160 breit, 90 hoch, y wächst nach unten, Boden bei y=82. Stehende Grundpose: head [80,30], neck [80,38], shoulderL [74,40], shoulderR [86,40], elbowL [72,50], elbowR [88,50], handL [72,59], handR [88,59], hip [80,58], kneeL [77,70], kneeR [83,70], footL [77,82], footR [83,82]. Nutze 6 bis 9 Frames: Ausgangslage, Ereignis, Sturz, Aufprall, Endlage. Gelenke bleiben anatomisch plausibel (Segmentlängen ungefähr konstant). Setze impact in dem Frame, in dem der Körper aufschlägt. bone ist exakt einer von: ${BONES.join(", ")} (neck-head = Kopf, neck-hip = Rumpf/Rippen/Wirbelsäule). frame ist der Index, ab dem die Verletzung sichtbar wird.`;
+
+const $=id=>document.getElementById(id);
+let files=[],abort=false,prog=0,target=0,lastErr="";
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+try{$("key").value=localStorage.getItem("rk_key")||""}catch(e){}
+setInterval(()=>{prog+=(target-prog)*.07;$("fill").style.width=prog.toFixed(1)+"%"},150);
+
+/* Dateien */
+const drop=$("drop"),fin=$("fin");
+drop.onclick=()=>fin.click();
+drop.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fin.click()}};
+fin.onchange=()=>{add(fin.files);fin.value=""};
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("on")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("on")}));
+drop.addEventListener("drop",e=>add(e.dataTransfer.files));
+function add(l){for(const f of l)files.push(f);chips()}
+function chips(){const c=$("chips");c.innerHTML="";files.forEach((f,i)=>{const d=document.createElement("span");d.className="chip";d.textContent=f.name;const b=document.createElement("button");b.textContent="×";b.setAttribute("aria-label","Entfernen");b.onclick=()=>{files.splice(i,1);chips()};d.append(b);c.append(d)})}
+const b64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(f)});
+async function parts(note){
+  const p=[];if(note)p.push({text:"Schilderung und Befunde:\n"+note});
+  for(const f of files){
+    if(f.type.startsWith("image/")||f.type==="application/pdf")p.push({inlineData:{mimeType:f.type,data:await b64(f)}});
+    else p.push({text:"Datei "+f.name+":\n"+await f.text()});
+  }
+  return p;
+}
+
+/* Gemini */
+async function call(model,key,sys,pr,json){
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
+    method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+    body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:pr}],generationConfig:Object.assign({temperature:.4},json?{responseMimeType:"application/json"}:{})})
+  });
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error((d.error&&d.error.message)||("HTTP "+r.status));
+  const t=((d.candidates||[])[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim();
+  if(!t)throw new Error("Leere Antwort");
+  return t;
+}
+async function retry(label,key,sys,pr,json,check){
+  let cycle=0;
+  while(true){
+    for(const m of MODELS){
+      if(abort)throw new Error("abort");
+      status(`${label}: Modell ${m}${cycle?` · Durchlauf ${cycle+1}`:""}`);
+      try{const t=await call(m,key,sys,pr,json);return check?check(t):t}
+      catch(e){lastErr=m+": "+e.message;$("err").textContent="Letzter Fehler – "+lastErr;status(`${label}: ${m} fehlgeschlagen, wechsle Modell …`);await sleep(800)}
+    }
+    cycle++;await sleep(Math.min(2000*cycle,10000));
+  }
+}
+const status=t=>$("status").textContent=t;
+
+/* Ablauf */
+$("stop").onclick=()=>{abort=true;status("Wird abgebrochen …")};
+$("go").onclick=async()=>{
+  const key=$("key").value.trim(),note=$("note").value.trim();
+  if(!key){$("key").focus();return}
+  if(!note&&!files.length){$("note").focus();return}
+  try{localStorage.setItem("rk_key",key)}catch(e){}
+  abort=false;prog=0;target=4;lastErr="";$("err").textContent="";
+  $("go").disabled=true;$("stop").classList.remove("hide");$("prog").classList.remove("hide");
+  $("repS").classList.add("hide");$("aniS").classList.add("hide");stopAnim();
+  try{
+    status("Dateien werden vorbereitet …");
+    const pr=await parts(note);target=40;
+    const rep=await retry("Bericht",key,SYS1,pr,false);
+    $("report").innerHTML=md(rep);$("repS").classList.remove("hide");window.__rep=rep;
+    target=55;
+    const anim=await retry("Animation",key,SYS2,[{text:"Bericht:\n"+rep+"\n\nOriginalangaben:\n"+(note||"(nur Dateien)")}].concat(pr.filter(p=>p.inlineData)),true,parseAnim);
+    target=100;status("Fertig.");$("err").textContent="";
+    $("aniS").classList.remove("hide");startAnim(anim);
+  }catch(e){status(e.message==="abort"?"Abgebrochen.":"Fehler: "+e.message)}
+  finally{$("go").disabled=false;$("stop").classList.add("hide")}
+};
+$("copy").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(window.__rep||"")};
+
+function md(t){
+  const e=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  let h="",ul=false;
+  for(let l of t.split("\n")){
+    l=e(l).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+    const li=l.match(/^\s*[-*]\s+(.*)/),hd=l.match(/^#{1,4}\s+(.*)/);
+    if(li){if(!ul){h+="<ul>";ul=true}h+="<li>"+li[1]+"</li>";continue}
+    if(ul){h+="</ul>";ul=false}
+    if(hd)h+="<h3>"+hd[1]+"</h3>";else if(l.trim())h+="<p>"+l+"</p>";
+  }
+  return h+(ul?"</ul>":"");
+}
+
+/* Animation */
+let A=null,T=0,playing=true,raf=0,last=0;const DUR=1.3,NS="http://www.w3.org/2000/svg";
+function parseAnim(t){
+  const d=JSON.parse(t.replace(/^```json|```$/g,"").trim());
+  if(!Array.isArray(d.frames)||d.frames.length<2)throw new Error("Zu wenige Frames");
+  d.frames.forEach(f=>J.forEach(k=>{const v=f.joints&&f.joints[k];if(!Array.isArray(v)||v.length!==2||v.some(n=>typeof n!=="number"))throw new Error("Ungültiges Gelenk "+k)}));
+  d.injuries=(d.injuries||[]).filter(i=>BONES.includes(i.bone));
+  return d;
+}
+function stopAnim(){cancelAnimationFrame(raf)}
+function startAnim(d){A=d;T=0;playing=true;$("play").textContent="Pause";last=performance.now();stopAnim();raf=requestAnimationFrame(tick)}
+function tick(n){
+  if(playing){T+=(n-last)/1000;const mx=(A.frames.length-1)*DUR;if(T>=mx){T=mx;playing=false;$("play").textContent="Abspielen"}}
+  last=n;draw();if(playing||true)raf=requestAnimationFrame(tick);
+}
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+function draw(){
+  const mx=(A.frames.length-1)*DUR,i=Math.min(Math.floor(T/DUR),A.frames.length-2),f=ease(Math.min(1,(T-i*DUR)/DUR)),a=A.frames[i],b=A.frames[i+1];
+  const P={};J.forEach(k=>P[k]=[a.joints[k][0]+(b.joints[k][0]-a.joints[k][0])*f,a.joints[k][1]+(b.joints[k][1]-a.joints[k][1])*f]);
+  const cur=f>.5?i+1:i,cs=getComputedStyle(document.documentElement),bone=cs.getPropertyValue("--bone"),bad=cs.getPropertyValue("--bad"),warn=cs.getPropertyValue("--warn"),mut=cs.getPropertyValue("--mut");
+  let s=`<line x1="0" y1="82" x2="160" y2="82" stroke="${mut}" stroke-width=".6"/>`;
+  const inj=A.injuries.filter(x=>x.frame<=cur),hit=new Set(inj.map(x=>x.bone));
+  BONES.forEach(k=>{const[p,q]=k.split("-"),r=hit.has(k);s+=`<line x1="${P[p][0]}" y1="${P[p][1]}" x2="${P[q][0]}" y2="${P[q][1]}" stroke="${r?bad:bone}" stroke-width="${r?2.4:1.6}" stroke-linecap="round"/>`});
+  s+=`<circle cx="${P.head[0]}" cy="${P.head[1]}" r="4.5" fill="var(--card)" stroke="${hit.has("neck-head")?bad:bone}" stroke-width="${hit.has("neck-head")?2.4:1.6}"/>`;
+  inj.forEach((x,n)=>{const[p,q]=x.bone.split("-"),mx2=(P[p][0]+P[q][0])/2,my=(P[p][1]+P[q][1])/2;s+=`<circle cx="${mx2}" cy="${my}" r="${2+Math.sin(T*6)*.5}" fill="none" stroke="${bad}" stroke-width=".7"/><text x="${mx2+4}" y="${my-3-n%3*0}" font-size="3.2" fill="${bad}">${String(x.label||"").replace(/[<&]/g,"")}</text>`});
+  const imp=(f>.3?b:a).impact||null,w=(f>.3?b:a)===b?f:1-f;
+  if(imp)s+=`<circle cx="${imp[0]}" cy="${imp[1]}" r="${3+(1-w)*8}" fill="none" stroke="${warn}" stroke-width="1.2" opacity="${.35+w*.65}"/>`;
+  $("svg").innerHTML=s;$("cap").textContent=A.frames[cur].label||"";$("seek").value=Math.round(T/mx*1000);
+}
+$("play").onclick=()=>{const mx=(A.frames.length-1)*DUR;if(T>=mx)T=0;playing=!playing;last=performance.now();$("play").textContent=playing?"Pause":"Abspielen"};
+$("replay").onclick=()=>{T=0;playing=true;last=performance.now();$("play").textContent="Pause"};
+$("seek").oninput=e=>{playing=false;$("play").textContent="Abspielen";T=e.target.value/1000*(A.frames.length-1)*DUR};
+</script>
+</body>
+</html>
