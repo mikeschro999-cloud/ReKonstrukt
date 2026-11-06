@@ -53,12 +53,17 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--ac)}
 <header>
   <h1>Re<span>Konstrukt</span></h1>
   <p>Verletzungsbefunde und Schilderungen hochladen, plausiblen Unfallhergang als Bericht und Animation erhalten.</p>
+  <button class="s" id="gear" style="margin-top:14px;padding:7px 16px">Einstellungen</button>
 </header>
 <main>
-  <section>
-    <h2>Google-AI-Schlüssel</h2>
-    <label for="key">API-Key (Google AI Studio). Er bleibt in diesem Browser und geht nur an Google.</label>
+  <section id="keyS" class="hide">
+    <h2>Einstellungen</h2>
+    <label for="key">Google-AI-Key (kostenlos in Google AI Studio). Er wird nur auf diesem Gerät gespeichert und geht nur an Google.</label>
     <input id="key" type="password" autocomplete="off" placeholder="AIza…">
+    <div class="row" style="margin-top:14px">
+      <button class="p" id="ksave">Speichern</button>
+      <button class="s" id="kdel">Key löschen</button>
+    </div>
   </section>
 
   <section>
@@ -99,7 +104,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--ac)}
 </main>
 
 <script>
-const MODELS=["gemini-2.5-flash","gemini-2.5-pro","gemini-2.0-flash","gemini-2.5-flash-lite","gemini-flash-latest"];
+const MODELS=["gemini-2.5-flash-lite","gemini-2.5-flash","gemini-flash-lite-latest","gemini-flash-latest"];
 const J=["head","neck","shoulderL","shoulderR","elbowL","elbowR","handL","handR","hip","kneeL","kneeR","footL","footR"];
 const BONES=["neck-head","neck-shoulderL","neck-shoulderR","shoulderL-elbowL","elbowL-handL","shoulderR-elbowR","elbowR-handR","neck-hip","hip-kneeL","kneeL-footL","hip-kneeR","kneeR-footR"];
 const SYS1=`Du bist ein erfahrener unfallchirurgisch-notfallmedizinischer Assistent für Ärztinnen und Ärzte. Du erhältst Schilderungen, Befunde und Bilder zu einer Verletzung. Schließe aktiv aus den Angaben auf den wahrscheinlichen Hergang und auf Verletzungen, die nicht genannt wurden, aber zu erwarten sind. Beispiele: Gedächtnislücke oder Bewusstlosigkeit bei Sturz spricht für Kopfanprall (SHT); Rippenfrakturen können Pneumothorax, Leber-, Milz- oder Nierenverletzung bedeuten; eine Beinfraktur mit Amnesie spricht für einen Sturz mit Kopfbeteiligung, nicht nur für direkte Gewalt aufs Bein. Antworte auf Deutsch in Markdown, prägnant, mit diesen Abschnitten als ###-Überschriften: Zusammenfassung, Wahrscheinlichster Hergang, Alternative Hergänge, Zu erwartende Begleitverletzungen, Empfohlene Diagnostik und Überwachung, Unsicherheiten. Kennzeichne Spekulatives klar als Hypothese.`;
@@ -110,7 +115,14 @@ Koordinatensystem 160 breit, 90 hoch, y wächst nach unten, Boden bei y=82. Steh
 const $=id=>document.getElementById(id);
 let files=[],abort=false,prog=0,target=0,lastErr="";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-try{$("key").value=localStorage.getItem("rk_key")||""}catch(e){}
+let KEY="";
+try{KEY=localStorage.getItem("rk_key")||""}catch(e){}
+function showKey(v){$("keyS").classList.toggle("hide",!v);if(v){$("key").value=KEY;$("key").focus()}}
+showKey(!KEY);
+$("gear").onclick=()=>showKey($("keyS").classList.contains("hide"));
+$("ksave").onclick=()=>{const v=$("key").value.trim();if(!v){$("key").focus();return}KEY=v;try{localStorage.setItem("rk_key",v)}catch(e){}$("key").value="";showKey(false)};
+$("key").addEventListener("keydown",e=>{if(e.key==="Enter")$("ksave").click()});
+$("kdel").onclick=()=>{KEY="";try{localStorage.removeItem("rk_key")}catch(e){}$("key").value="";};
 setInterval(()=>{prog+=(target-prog)*.07;$("fill").style.width=prog.toFixed(1)+"%"},150);
 
 /* Dateien */
@@ -162,10 +174,9 @@ const status=t=>$("status").textContent=t;
 /* Ablauf */
 $("stop").onclick=()=>{abort=true;status("Wird abgebrochen …")};
 $("go").onclick=async()=>{
-  const key=$("key").value.trim(),note=$("note").value.trim();
-  if(!key){$("key").focus();return}
+  const key=KEY,note=$("note").value.trim();
+  if(!key){showKey(true);return}
   if(!note&&!files.length){$("note").focus();return}
-  try{localStorage.setItem("rk_key",key)}catch(e){}
   abort=false;prog=0;target=4;lastErr="";$("err").textContent="";
   $("go").disabled=true;$("stop").classList.remove("hide");$("prog").classList.remove("hide");
   $("repS").classList.add("hide");$("aniS").classList.add("hide");stopAnim();
