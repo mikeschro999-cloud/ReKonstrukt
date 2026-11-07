@@ -58,8 +58,8 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--ac)}
 <main>
   <section id="keyS" class="hide">
     <h2>Einstellungen</h2>
-    <label for="key">Google-AI-Key (kostenlos in Google AI Studio). Er wird nur auf diesem Gerät gespeichert und geht nur an Google.</label>
-    <input id="key" type="password" autocomplete="off" placeholder="AIza…">
+    <label for="key">Claude-API-Key (platform.claude.com). Er wird nur auf diesem Gerät gespeichert und geht nur an Anthropic.</label>
+    <input id="key" type="password" autocomplete="off" placeholder="sk-ant-…">
     <div class="row" style="margin-top:14px">
       <button class="p" id="ksave">Speichern</button>
       <button class="s" id="kdel">Key löschen</button>
@@ -104,7 +104,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--ac)}
 </main>
 
 <script>
-const MODELS=["gemini-2.5-flash-lite","gemini-2.5-flash","gemini-flash-lite-latest","gemini-flash-latest"];
+const MODELS=["claude-haiku-5-5"];
 const J=["head","neck","shoulderL","shoulderR","elbowL","elbowR","handL","handR","hip","kneeL","kneeR","footL","footR"];
 const BONES=["neck-head","neck-shoulderL","neck-shoulderR","shoulderL-elbowL","elbowL-handL","shoulderR-elbowR","elbowR-handR","neck-hip","hip-kneeL","kneeL-footL","hip-kneeR","kneeR-footR"];
 const SYS1=`Du bist ein erfahrener unfallchirurgisch-notfallmedizinischer Assistent für Ärztinnen und Ärzte. Du erhältst Schilderungen, Befunde und Bilder zu einer Verletzung. Schließe aktiv aus den Angaben auf den wahrscheinlichen Hergang und auf Verletzungen, die nicht genannt wurden, aber zu erwarten sind. Beispiele: Gedächtnislücke oder Bewusstlosigkeit bei Sturz spricht für Kopfanprall (SHT); Rippenfrakturen können Pneumothorax, Leber-, Milz- oder Nierenverletzung bedeuten; eine Beinfraktur mit Amnesie spricht für einen Sturz mit Kopfbeteiligung, nicht nur für direkte Gewalt aufs Bein. Antworte auf Deutsch in Markdown, prägnant, mit diesen Abschnitten als ###-Überschriften: Zusammenfassung, Wahrscheinlichster Hergang, Alternative Hergänge, Zu erwartende Begleitverletzungen, Empfohlene Diagnostik und Überwachung, Unsicherheiten. Kennzeichne Spekulatives klar als Hypothese.`;
@@ -116,13 +116,13 @@ const $=id=>document.getElementById(id);
 let files=[],abort=false,prog=0,target=0,lastErr="";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let KEY="";
-try{KEY=localStorage.getItem("rk_key")||""}catch(e){}
+try{KEY=localStorage.getItem("rk_claude_key")||""}catch(e){}
 function showKey(v){$("keyS").classList.toggle("hide",!v);if(v){$("key").value=KEY;$("key").focus()}}
 showKey(!KEY);
 $("gear").onclick=()=>showKey($("keyS").classList.contains("hide"));
-$("ksave").onclick=()=>{const v=$("key").value.trim();if(!v){$("key").focus();return}KEY=v;try{localStorage.setItem("rk_key",v)}catch(e){}$("key").value="";showKey(false)};
+$("ksave").onclick=()=>{const v=$("key").value.trim();if(!v){$("key").focus();return}KEY=v;try{localStorage.setItem("rk_claude_key",v)}catch(e){}$("key").value="";showKey(false)};
 $("key").addEventListener("keydown",e=>{if(e.key==="Enter")$("ksave").click()});
-$("kdel").onclick=()=>{KEY="";try{localStorage.removeItem("rk_key")}catch(e){}$("key").value="";};
+$("kdel").onclick=()=>{KEY="";try{localStorage.removeItem("rk_claude_key")}catch(e){}$("key").value="";};
 setInterval(()=>{prog+=(target-prog)*.07;$("fill").style.width=prog.toFixed(1)+"%"},150);
 
 /* Dateien */
@@ -136,24 +136,29 @@ drop.addEventListener("drop",e=>add(e.dataTransfer.files));
 function add(l){for(const f of l)files.push(f);chips()}
 function chips(){const c=$("chips");c.innerHTML="";files.forEach((f,i)=>{const d=document.createElement("span");d.className="chip";d.textContent=f.name;const b=document.createElement("button");b.textContent="×";b.setAttribute("aria-label","Entfernen");b.onclick=()=>{files.splice(i,1);chips()};d.append(b);c.append(d)})}
 const b64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(f)});
+function shrink(f){return new Promise((res,rej)=>{const u=URL.createObjectURL(f),i=new Image();i.onload=()=>{const k=Math.min(1,1600/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);c.getContext("2d").drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL("image/jpeg",.85).split(",")[1])};i.onerror=()=>rej(new Error("Bild nicht lesbar"));i.src=u})}
 async function parts(note){
-  const p=[];if(note)p.push({text:"Schilderung und Befunde:\n"+note});
+  const p=[];if(note)p.push({type:"text",text:"Schilderung und Befunde:\n"+note});
   for(const f of files){
-    if(f.type.startsWith("image/")||f.type==="application/pdf")p.push({inlineData:{mimeType:f.type,data:await b64(f)}});
-    else p.push({text:"Datei "+f.name+":\n"+await f.text()});
+    if(f.type.startsWith("image/"))p.push({type:"image",source:{type:"base64",media_type:"image/jpeg",data:await shrink(f)}});
+    else if(f.type==="application/pdf")p.push({type:"document",source:{type:"base64",media_type:"application/pdf",data:await b64(f)}});
+    else p.push({type:"text",text:"Datei "+f.name+":\n"+await f.text()});
   }
   return p;
 }
 
-/* Gemini */
-async function call(model,key,sys,pr,json){
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
-    method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
-    body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:pr}],generationConfig:Object.assign({temperature:.4},json?{responseMimeType:"application/json"}:{})})
+/* Claude */
+
+async function call(model,key,sys,pr){
+  const r=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model,max_tokens:8000,system:sys,messages:[{role:"user",content:pr}]})
   });
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error((d.error&&d.error.message)||("HTTP "+r.status));
-  const t=((d.candidates||[])[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim();
+  if(d.stop_reason==="refusal")throw new Error("Antwort wurde vom Modell verweigert");
+  const t=(d.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("").trim();
   if(!t)throw new Error("Leere Antwort");
   return t;
 }
@@ -186,7 +191,7 @@ $("go").onclick=async()=>{
     const rep=await retry("Bericht",key,SYS1,pr,false);
     $("report").innerHTML=md(rep);$("repS").classList.remove("hide");window.__rep=rep;
     target=55;
-    const anim=await retry("Animation",key,SYS2,[{text:"Bericht:\n"+rep+"\n\nOriginalangaben:\n"+(note||"(nur Dateien)")}].concat(pr.filter(p=>p.inlineData)),true,parseAnim);
+    const anim=await retry("Animation",key,SYS2,[{type:"text",text:"Bericht:\n"+rep+"\n\nOriginalangaben:\n"+(note||"(nur Dateien)")}].concat(pr.filter(p=>p.type!=="text")),true,parseAnim);
     target=100;status("Fertig.");$("err").textContent="";
     $("aniS").classList.remove("hide");startAnim(anim);
   }catch(e){status(e.message==="abort"?"Abgebrochen.":"Fehler: "+e.message)}
@@ -210,7 +215,7 @@ function md(t){
 /* Animation */
 let A=null,T=0,playing=true,raf=0,last=0;const DUR=1.3,NS="http://www.w3.org/2000/svg";
 function parseAnim(t){
-  const d=JSON.parse(t.replace(/^```json|```$/g,"").trim());
+  const d=JSON.parse(t.slice(t.indexOf("{"),t.lastIndexOf("}")+1));
   if(!Array.isArray(d.frames)||d.frames.length<2)throw new Error("Zu wenige Frames");
   d.frames.forEach(f=>J.forEach(k=>{const v=f.joints&&f.joints[k];if(!Array.isArray(v)||v.length!==2||v.some(n=>typeof n!=="number"))throw new Error("Ungültiges Gelenk "+k)}));
   d.injuries=(d.injuries||[]).filter(i=>BONES.includes(i.bone));
